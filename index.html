@@ -443,6 +443,7 @@ async function api(url, method="GET", body=null) {
 }
 
 async function loadData() {
+  $("notice").textContent = "جاري تحميل القوائم...";
   if (loading) {
     reloadPending = true;
     return;
