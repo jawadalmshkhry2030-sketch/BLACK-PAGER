@@ -42,6 +42,73 @@ input{width:100%;padding:12px;background:#080d0a;color:white;border:1px solid #5
 @media(max-width:360px){.groups{grid-template-columns:1fr}}
 .wave-controls{display:flex;align-items:center;gap:7px;font-size:9px;letter-spacing:1px}
 .wave-next{padding:1px 7px;border:1px solid #43513a;border-radius:4px;background:#879b6c;color:#111;font-size:16px;font-weight:bold;line-height:1.1}
+
+.pager-modal-backdrop {
+  display:none;
+  position:fixed;
+  inset:0;
+  z-index:10000;
+  background:rgba(0,0,0,.88);
+  align-items:center;
+  justify-content:center;
+  padding:16px;
+}
+.pager-modal {
+  width:100%;
+  max-width:420px;
+  background:linear-gradient(145deg,#171e19,#070a08);
+  border:1px solid #65765b;
+  border-radius:16px;
+  padding:20px;
+  box-shadow:0 15px 50px #000;
+}
+.pager-modal h3 {
+  color:#b8ce9c;
+  text-align:center;
+  margin-top:0;
+}
+.pager-modes {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin:16px 0;
+}
+.pager-mode {
+  min-height:75px;
+  border:1px solid #59635b;
+  background:#101612;
+  color:#aaa;
+  font-size:14px;
+}
+.pager-mode.active {
+  border:2px solid #9bb77d;
+  color:#c9e7a7;
+  background:#1c2b20;
+}
+.pager-modal label {
+  display:block;
+  color:#b8ce9c;
+  font-size:13px;
+  margin-top:12px;
+}
+.pager-modal input {
+  width:100%;
+  margin:7px 0;
+}
+.pager-modal-actions {
+  display:flex;
+  gap:9px;
+  margin-top:15px;
+}
+.pager-modal-actions button {
+  flex:1;
+}
+.pager-publish {
+  background:#263d2b;
+  border-color:#8ca879;
+  color:#d4f2b7;
+}
+
 </style>
 </head>
 <body>
@@ -231,43 +298,7 @@ async function addGroup() {
 }
 
 async function addItem(group) {
-  const mode = prompt("طريقة إضافة البيجر:\n1 - مع عدد\n2 - بدون عدد");
-  if (mode === null) return;
-  if (mode !== "1" && mode !== "2") {
-    return alert("اختر 1 أو 2");
-  }
-
-  const phrase = prompt("اكتب عبارة البيجر:");
-  if (phrase === null) return;
-  if (!phrase.trim()) return alert("اكتب عبارة البيجر");
-
-  let finalPhrase = phrase.trim();
-
-  if (mode === "1") {
-    const number = prompt("اكتب العدد:");
-    if (number === null) return;
-    if (!/^\\d{1,6}$/.test(number.trim())) {
-      return alert("اكتب عدداً صحيحاً");
-    }
-    finalPhrase += " رقم " + number.trim();
-  }
-
-  if (finalPhrase.length > 200) {
-    return alert("العبارة طويلة جداً");
-  }
-
-  if (!confirm("نشر البيجر التالي؟\\n\\n" + finalPhrase)) return;
-
-  try {
-    await api("/api/items", "POST", {
-      phrase: finalPhrase,
-      group_id: group.id
-    });
-    await loadData();
-    $("notice").textContent = "تم نشر البيجر";
-  } catch(error) {
-    alert(error.message);
-  }
+  window.openPagerModal(group);
 }
 
 async function editGroup(group) {
@@ -778,6 +809,135 @@ loadData();
   }
 
   checkStatus();
+})();
+</script>
+
+
+<div class="pager-modal-backdrop" id="pagerModal">
+  <div class="pager-modal" role="dialog" aria-modal="true" aria-labelledby="pagerModalTitle">
+    <h3 id="pagerModalTitle">إضافة بيجر جديد</h3>
+    <p style="text-align:center;color:#aaa;font-size:12px">اختر طريقة إضافة البيجر</p>
+
+    <div class="pager-modes">
+      <button type="button" class="pager-mode active" data-mode="number">
+        <strong>123</strong>
+        <br>مع عدد
+      </button>
+      <button type="button" class="pager-mode" data-mode="plain">
+        <strong>ABC</strong>
+        <br>بدون عدد
+      </button>
+    </div>
+
+    <label for="pagerPhrase">عبارة البيجر</label>
+    <input id="pagerPhrase" type="text" maxlength="200" placeholder="اكتب عبارة البيجر">
+
+    <div id="pagerNumberField">
+      <label for="pagerNumber">العدد</label>
+      <input id="pagerNumber" type="number" min="0" max="999999" step="1" placeholder="اكتب العدد">
+    </div>
+
+    <div class="pager-modal-actions">
+      <button type="button" id="pagerCancel">إلغاء</button>
+      <button type="button" class="pager-publish" id="pagerPublish">نشر البيجر</button>
+    </div>
+    <p id="pagerModalNotice" class="note"></p>
+  </div>
+</div>
+
+
+<script>
+(() => {
+  const modal = document.getElementById("pagerModal");
+  const phraseInput = document.getElementById("pagerPhrase");
+  const numberInput = document.getElementById("pagerNumber");
+  const numberField = document.getElementById("pagerNumberField");
+  const notice = document.getElementById("pagerModalNotice");
+  const publish = document.getElementById("pagerPublish");
+  let selectedMode = "number";
+  let selectedGroup = null;
+
+  function chooseMode(mode) {
+    selectedMode = mode;
+    document.querySelectorAll(".pager-mode").forEach(button => {
+      button.classList.toggle("active", button.dataset.mode === mode);
+    });
+    numberField.style.display = mode === "number" ? "block" : "none";
+    notice.textContent = "";
+  }
+
+  window.openPagerModal = function(group) {
+    selectedGroup = group;
+    phraseInput.value = "";
+    numberInput.value = "";
+    notice.textContent = "";
+    chooseMode("number");
+    modal.style.display = "flex";
+    phraseInput.focus();
+  };
+
+  function closeModal() {
+    modal.style.display = "none";
+    selectedGroup = null;
+  }
+
+  document.querySelectorAll(".pager-mode").forEach(button => {
+    button.addEventListener("click", () => chooseMode(button.dataset.mode));
+  });
+
+  document.getElementById("pagerCancel").onclick = closeModal;
+
+  modal.addEventListener("click", event => {
+    if (event.target === modal) closeModal();
+  });
+
+  publish.onclick = async () => {
+    if (!selectedGroup) return;
+
+    const phrase = phraseInput.value.trim();
+    if (!phrase) {
+      notice.textContent = "اكتب عبارة البيجر أولاً";
+      phraseInput.focus();
+      return;
+    }
+
+    let finalPhrase = phrase;
+
+    if (selectedMode === "number") {
+      const number = numberInput.value.trim();
+
+      if (!/^\d{1,6}$/.test(number)) {
+        notice.textContent = "اكتب عدداً صحيحاً";
+        numberInput.focus();
+        return;
+      }
+
+      finalPhrase += " رقم " + number;
+    }
+
+    if (finalPhrase.length > 200) {
+      notice.textContent = "العبارة أطول من الحد المسموح";
+      return;
+    }
+
+    publish.disabled = true;
+    notice.textContent = "جاري النشر...";
+
+    try {
+      await api("/api/items", "POST", {
+        phrase: finalPhrase,
+        group_id: selectedGroup.id
+      });
+
+      await loadData();
+      closeModal();
+      $("notice").textContent = "تم نشر البيجر بنجاح";
+    } catch (error) {
+      notice.textContent = error.message;
+    } finally {
+      publish.disabled = false;
+    }
+  };
 })();
 </script>
 
