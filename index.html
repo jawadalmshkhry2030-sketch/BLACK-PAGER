@@ -322,11 +322,14 @@ async function deleteGroup(group) {
 }
 
 async function editItem(item) {
-  const phrase=prompt("اكتب العبارة الجديدة:",item.phrase);
+  const needsNumber = item.phrase.startsWith("[[N]]");
+  const currentPhrase = needsNumber ? item.phrase.slice(5) : item.phrase;
+  const phrase=prompt("اكتب العبارة الجديدة:",currentPhrase);
   if(phrase===null)return;
   if(!phrase.trim())return alert("العبارة مطلوبة");
   try {
-    await api("/api/items/"+encodeURIComponent(item.id),"PATCH",{phrase:phrase.trim()});
+    const savedPhrase = (needsNumber ? "[[N]]" : "") + phrase.trim();
+    await api("/api/items/"+encodeURIComponent(item.id),"PATCH",{phrase:savedPhrase});
     await loadData();
     $("notice").textContent="تم تعديل البيجر";
   } catch(error){alert(error.message);}
@@ -347,16 +350,17 @@ function sendPager(group,item) {
     return;
   }
 
-  let text=item.phrase;
+  const needsNumber = item.phrase.startsWith("[[N]]");
+  let text = needsNumber ? item.phrase.slice(5) : item.phrase;
 
-  if(group.title==="== ماب النووي ==" && item.phrase==="كمبر عند البيس رقم") {
-    const number=prompt("اختر رقم البيس من 1 إلى 6");
-    if(number===null)return;
-    if(!/^[1-6]$/.test(number)) {
-      $("notice").textContent="اختر رقماً من 1 إلى 6";
+  if(needsNumber || (group.title==="== ماب النووي ==" && item.phrase==="كمبر عند البيس رقم")) {
+    const number = prompt("اكتب رقماً من 1 إلى 6:");
+    if(number === null) return;
+    if(!/^[1-6]$/.test(number.trim())) {
+      $("notice").textContent = "اختر رقماً من 1 إلى 6";
       return;
     }
-    text+=" "+number;
+    text += " " + number.trim();
   }
 
   socket.emit("send-message",text);
@@ -464,7 +468,7 @@ function renderIndex() {
       const meaning = document.createElement("span");
       meaning.className = "meaning";
       meaning.textContent = visibleMeaningIds.has(item.id)
-        ? item.phrase
+        ? (item.phrase.startsWith("[[N]]") ? item.phrase.slice(5) : item.phrase)
         : "***";
 
       const toggle = document.createElement("button");
@@ -833,18 +837,10 @@ loadData();
     <input id="pagerPhrase" type="text" maxlength="200" placeholder="اكتب عبارة البيجر">
 
     <div id="pagerNumberField">
-      <label>اختر العدد</label>
-      <div class="pager-modes" id="pagerNumberChoices">
-        <button type="button" class="pager-mode" data-number="1">1</button>
-        <button type="button" class="pager-mode" data-number="2">2</button>
-        <button type="button" class="pager-mode" data-number="3">3</button>
-        <button type="button" class="pager-mode" data-number="4">4</button>
-        <button type="button" class="pager-mode" data-number="5">5</button>
-        <button type="button" class="pager-mode" data-number="6">6</button>
-      </div>
-    </div>
-
-    <div class="pager-modal-actions">
+      <p style="color:#9bb77d;font-size:12px;text-align:center">
+        سيُطلب الرقم من 1 إلى 6 عند إرسال البيجر
+      </p>
+    </div><div class="pager-modal-actions">
       <button type="button" id="pagerCancel">إلغاء</button>
       <button type="button" class="pager-publish" id="pagerPublish">نشر البيجر</button>
     </div>
@@ -857,7 +853,6 @@ loadData();
 (() => {
   const modal = document.getElementById("pagerModal");
   const phraseInput = document.getElementById("pagerPhrase");
-  let selectedNumber = null;
   const numberField = document.getElementById("pagerNumberField");
   const notice = document.getElementById("pagerModalNotice");
   const publish = document.getElementById("pagerPublish");
@@ -870,15 +865,12 @@ loadData();
       button.classList.toggle("active", button.dataset.mode === mode);
     });
     numberField.style.display = mode === "number" ? "block" : "none";
-    selectedNumber = null;
-    document.querySelectorAll("[data-number]").forEach(button => button.classList.remove("active"));
     notice.textContent = "";
   }
 
   window.openPagerModal = function(group) {
     selectedGroup = group;
     phraseInput.value = "";
-    selectedNumber = null;
     notice.textContent = "";
     chooseMode("number");
     modal.style.display = "flex";
@@ -894,15 +886,6 @@ loadData();
     button.addEventListener("click", () => chooseMode(button.dataset.mode));
   });
 
-  document.querySelectorAll("[data-number]").forEach(button => {
-    button.addEventListener("click", () => {
-      selectedNumber = button.dataset.number;
-      document.querySelectorAll("[data-number]").forEach(item => {
-        item.classList.toggle("active", item === button);
-      });
-      notice.textContent = "";
-    });
-  });
 
   document.getElementById("pagerCancel").onclick = closeModal;
 
@@ -920,16 +903,7 @@ loadData();
       return;
     }
 
-    let finalPhrase = phrase;
-
-    if (selectedMode === "number") {
-      if (!selectedNumber) {
-        notice.textContent = "اختر عدداً من 1 إلى 6";
-        return;
-      }
-
-      finalPhrase += " رقم " + selectedNumber;
-    }
+    let finalPhrase = (selectedMode === "number" ? "[[N]]" : "") + phrase;
 
     if (finalPhrase.length > 200) {
       notice.textContent = "العبارة أطول من الحد المسموح";
