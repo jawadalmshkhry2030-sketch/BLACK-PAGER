@@ -340,7 +340,7 @@ function updateBatteryIndicator() {
   if (!label) return;
 
   if (!navigator.getBattery) {
-    label.textContent = "BAT --";
+    label.textContent = "BAT N/A";
     return;
   }
 
@@ -350,12 +350,11 @@ function updateBatteryIndicator() {
         Math.round(battery.level * 100) + "%" +
         (battery.charging ? " +" : "");
     };
-
     update();
     battery.addEventListener("levelchange", update);
     battery.addEventListener("chargingchange", update);
   }).catch(() => {
-    label.textContent = "BAT --";
+    label.textContent = "BAT N/A";
   });
 }
 
@@ -842,9 +841,14 @@ function clock() {
 }
 
 clock();
-setInterval(clock,1000);
+setInterval(clock, 1000);
 updateLinkIndicator();
 updateBatteryIndicator();
+window.addEventListener("pageshow", () => {
+  clock();
+  updateLinkIndicator();
+  updateBatteryIndicator();
+});
 setMessageIndicator(false);
 loadData();
 </script>
