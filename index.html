@@ -13,19 +13,30 @@ h1{text-align:center;letter-spacing:4px}
 .screen{background:#a9bd8c;color:#111;border:8px solid #080b09;border-radius:5px;height:155px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:inset 0 0 15px #526341}
 .top,.bottom{display:flex;justify-content:space-between;font-size:10px;font-weight:bold}
 .message{text-align:center;font-size:20px;font-weight:bold;overflow-wrap:anywhere}
-.controls{display:flex;justify-content:center;gap:18px;margin:16px}
+.controls{display:flex;justify-content:center;gap:8px;margin:16px;flex-wrap:wrap}
 button{cursor:pointer;background:#252b27;color:white;border:1px solid #59635b;border-radius:10px;padding:11px;font-family:inherit}
+button:active{transform:scale(.97)}
 .power{width:52px;height:52px;border-radius:50%;font-size:11px}
 .groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:15px}
-.group{background:#131915;border:1px solid #39443c;border-radius:12px;overflow:hidden}
+.group{background:#131915;border:1px solid #39443c;border-radius:12px;overflow:hidden;min-width:0}
 summary{padding:14px;cursor:pointer;color:#b8ce9c;font-weight:bold;font-size:13px}
 .pagers{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;padding:0 9px 10px}
-.pagers button{font-size:12px}
-.note{text-align:center;color:#b8ce9c;font-size:12px;margin:12px}
-.panel{max-width:600px;margin:18px auto;background:#131915;border:1px solid #39443c;border-radius:12px;padding:15px}
+.pager-button{font-size:12px;overflow-wrap:anywhere}
+.note{text-align:center;color:#b8ce9c;font-size:12px;margin:12px;min-height:18px}
+.panel{max-width:650px;margin:18px auto;background:#131915;border:1px solid #39443c;border-radius:12px;padding:15px}
 input{width:100%;padding:12px;background:#080d0a;color:white;border:1px solid #59635b;border-radius:8px;margin:8px 0}
-.index{font-size:13px;line-height:2}
-.eye{padding:3px 8px;margin:0 4px;font-size:13px;vertical-align:middle}
+.index{font-size:13px;line-height:2;overflow-wrap:anywhere}
+.index-group{margin:12px 0;padding:10px;background:#0b100d;border:1px solid #303b33;border-radius:9px}
+.index-title{color:#b8ce9c;font-weight:bold}
+.index-item{padding:3px 0;border-bottom:1px solid #252b27}
+.toolbar{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}
+.toolbar button{flex:1}
+.small-actions{display:flex;gap:5px;flex-wrap:wrap;padding:0 9px 10px}
+.small-actions button{font-size:11px;padding:7px}
+.add-button{width:100%;margin-top:8px;color:#b8ce9c}
+.danger{border-color:#854747;color:#ffaaaa}
+.edit{border-color:#7b8050;color:#e5e8a9}
+.section-heading{max-width:650px;margin:25px auto 8px}
 @media(max-width:360px){.groups{grid-template-columns:1fr}}
 </style>
 </head>
@@ -47,175 +58,372 @@ input{width:100%;padding:12px;background:#080d0a;color:white;border:1px solid #5
 <div class="note" id="status">الجهاز مغلق</div>
 </section>
 
-<h3>قوائم البيجر</h3>
-<p style="font-size:12px;color:#aaa">افتح القائمة واضغط رقم البيجر للإرسال مباشرة.</p>
+<h3 class="section-heading">قوائم البيجر</h3>
+<p style="font-size:12px;color:#aaa">افتح القائمة واضغط البيجر للإرسال مباشرة.</p>
 <div class="groups" id="groups"></div>
 <div class="note" id="notice"></div>
+
+<section class="panel">
+<h3>التخصيص المشترك</h3>
+<p style="font-size:12px;color:#aaa">أي إضافة أو تعديل أو حذف يظهر لجميع زوار الموقع.</p>
+<button class="add-button" id="addGroup">＋ إنشاء قائمة جديدة</button>
+</section>
 
 <section class="panel">
 <h3>الفهرس</h3>
 <input id="pass" type="password" placeholder="كلمة المرور">
 <button style="width:100%" id="indexBtn">فتح الفهرس</button>
-<div class="index" id="index" hidden></div>
+<div id="indexArea" hidden>
+<div class="toolbar">
+<button id="showAll">👁️ إظهار كل المعاني</button>
+<button id="hideAll">🙈 إخفاء كل المعاني</button>
+</div>
+<div class="index" id="index"></div>
+</div>
 </section>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io();
+const $ = id => document.getElementById(id);
+
+let powered = false;
+let data = [];
+let meaningsVisible = false;
+let loading = false;
 
 socket.on("pager-message", receive);
 socket.on("send-success", () => {
   $("notice").textContent = "تم إرسال الرسالة";
 });
+socket.on("data-changed", loadData);
 
-const data=[
-{title:"== الحياة الواقعيه ==",items:["اهلي عندي","حسيت اني بطفي","نقلب على الشخص","اعطي ميوت للشخص","شوف الخاص"]},
-{title:"== التواصل ==",items:["اي","لا","ممكن","بكيفك","تعال","كومبو"]},
-{title:"== مابات اخرى ==",items:["نتحالف","نخرب"]},
-{title:"== ماب النووي ==",items:["جمعت النووي خذ طيارة و تعال","حركة السبام بالصواريخ","كمبر عند البيس رقم"]}
-];
-
-let powered=false;
-const $=id=>document.getElementById(id);
-
-function beep(){
-try{
-const C=AudioContext||webkitAudioContext;
-const c=new C(),o=c.createOscillator(),g=c.createGain();
-o.frequency.value=880;
-g.gain.value=.04;
-o.connect(g);g.connect(c.destination);
-o.start();
-setTimeout(()=>o.stop(),140);
-setTimeout(()=>{
-  const o2=c.createOscillator();
-  o2.frequency.value=880;
-  o2.connect(g);
-  o2.start();
-  setTimeout(()=>{o2.stop();c.close()},140);
-},230);
-}catch(e){}
+async function api(url, method="GET", body=null) {
+  const options = {method,headers:{"Content-Type":"application/json"}};
+  if(body) options.body=JSON.stringify(body);
+  const response=await fetch(url,options);
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok) throw new Error(result.error||"حدث خطأ");
+  return result;
 }
 
-function receive(text){
-$("message").textContent=text;
-$("state").textContent="NEW MESSAGE";
-$("status").textContent="وصلت رسالة جديدة";
-beep();
-if(navigator.vibrate)navigator.vibrate(150);
+async function loadData() {
+  if(loading)return;
+  loading=true;
+  try {
+    const result=await api("/api/data");
+    data=result.groups.map(group=>({
+      ...group,
+      items:result.items.filter(item=>item.group_id===group.id)
+    }));
+    renderGroups();
+    if(!$("indexArea").hidden)renderIndex();
+    $("notice").textContent="";
+  } catch(error) {
+    $("notice").textContent="تعذر تحميل القوائم: "+error.message;
+  } finally {
+    loading=false;
+  }
+}
 
-if ("Notification" in window && Notification.permission === "granted") {
-  new Notification("BLACK PAGER", {
-    body: "وصلتك رسالة جديدة: " + text,
-    tag: "black-pager-message"
+function makeButton(label, className, action) {
+  const button=document.createElement("button");
+  button.textContent=label;
+  if(className)button.className=className;
+  button.onclick=action;
+  return button;
+}
+
+function renderGroups() {
+  const container=$("groups");
+  container.replaceChildren();
+
+  data.forEach(group=>{
+    const box=document.createElement("details");
+    box.className="group";
+
+    const summary=document.createElement("summary");
+    summary.textContent=group.title;
+    box.appendChild(summary);
+
+    const row=document.createElement("div");
+    row.className="pagers";
+
+    group.items.forEach((item,i)=>{
+      const btn=makeButton("بيجر "+(i+1),"pager-button",()=>sendPager(group,item));
+      row.appendChild(btn);
+    });
+
+    box.appendChild(row);
+
+    const actions=document.createElement("div");
+    actions.className="small-actions";
+
+    actions.appendChild(makeButton("＋ إضافة بيجر","",()=>addItem(group)));
+    actions.appendChild(makeButton("تعديل القائمة","edit",()=>editGroup(group)));
+    actions.appendChild(makeButton("حذف القائمة","danger",()=>deleteGroup(group)));
+
+    group.items.forEach((item,i)=>{
+      actions.appendChild(makeButton("تعديل بيجر "+(i+1),"edit",()=>editItem(item)));
+      actions.appendChild(makeButton("حذف بيجر "+(i+1),"danger",()=>deleteItem(item)));
+    });
+
+    box.appendChild(actions);
+    container.appendChild(box);
   });
 }
+
+async function addGroup() {
+  const title=prompt("اكتب اسم القائمة الجديدة:");
+  if(title===null)return;
+  if(!title.trim())return alert("اكتب اسم القائمة");
+  try {
+    await api("/api/groups","POST",{title:title.trim()});
+    await loadData();
+    $("notice").textContent="تم إنشاء القائمة";
+  } catch(error){alert(error.message);}
 }
 
-data.forEach((group,gi)=>{
-const box=document.createElement("details");
-box.className="group";
-const summary=document.createElement("summary");
-summary.textContent=group.title;
-box.appendChild(summary);
-
-const row=document.createElement("div");
-row.className="pagers";
-
-group.items.forEach((phrase,i)=>{
-const btn=document.createElement("button");
-btn.textContent="بيجر "+(i+1);
-btn.onclick=()=>{
-if(!powered){$("notice").textContent="شغّل البيجر أولاً";return;}
-let text=phrase;
-
-if(gi===3&&i===2){
-const number=prompt("اختر رقم البيس من 1 إلى 6");
-if(number===null)return;
-if(!/^[1-6]$/.test(number)){
-$("notice").textContent="اختر رقماً من 1 إلى 6";
-return;
+async function addItem(group) {
+  const phrase=prompt("اكتب عبارة البيجر الجديدة:");
+  if(phrase===null)return;
+  if(!phrase.trim())return alert("اكتب عبارة البيجر");
+  try {
+    await api("/api/items","POST",{phrase:phrase.trim(),group_id:group.id});
+    await loadData();
+    $("notice").textContent="تمت إضافة البيجر";
+  } catch(error){alert(error.message);}
 }
-text+=" "+number;
-}
-socket.emit("send-message", text);
-$("notice").textContent="جاري الإرسال...";
-};
-row.appendChild(btn);
-});
 
-box.appendChild(row);
-$("groups").appendChild(box);
-});
+async function editGroup(group) {
+  const title=prompt("اكتب الاسم الجديد للقائمة:",group.title);
+  if(title===null)return;
+  if(!title.trim())return alert("اسم القائمة مطلوب");
+  try {
+    await api("/api/groups/"+encodeURIComponent(group.id),"PATCH",{title:title.trim()});
+    await loadData();
+    $("notice").textContent="تم تعديل القائمة";
+  } catch(error){alert(error.message);}
+}
+
+async function deleteGroup(group) {
+  if(!confirm("هل تريد حذف القائمة وجميع البيجرات الموجودة داخلها؟"))return;
+  try {
+    await api("/api/groups/"+encodeURIComponent(group.id),"DELETE");
+    await loadData();
+    $("notice").textContent="تم حذف القائمة";
+  } catch(error){alert(error.message);}
+}
+
+async function editItem(item) {
+  const phrase=prompt("اكتب العبارة الجديدة:",item.phrase);
+  if(phrase===null)return;
+  if(!phrase.trim())return alert("العبارة مطلوبة");
+  try {
+    await api("/api/items/"+encodeURIComponent(item.id),"PATCH",{phrase:phrase.trim()});
+    await loadData();
+    $("notice").textContent="تم تعديل البيجر";
+  } catch(error){alert(error.message);}
+}
+
+async function deleteItem(item) {
+  if(!confirm("هل تريد حذف هذا البيجر؟"))return;
+  try {
+    await api("/api/items/"+encodeURIComponent(item.id),"DELETE");
+    await loadData();
+    $("notice").textContent="تم حذف البيجر";
+  } catch(error){alert(error.message);}
+}
+
+function sendPager(group,item) {
+  if(!powered) {
+    $("notice").textContent="شغّل البيجر أولاً";
+    return;
+  }
+
+  let text=item.phrase;
+
+  if(group.title==="== ماب النووي ==" && item.phrase==="كمبر عند البيس رقم") {
+    const number=prompt("اختر رقم البيس من 1 إلى 6");
+    if(number===null)return;
+    if(!/^[1-6]$/.test(number)) {
+      $("notice").textContent="اختر رقماً من 1 إلى 6";
+      return;
+    }
+    text+=" "+number;
+  }
+
+  socket.emit("send-message",text);
+  $("notice").textContent="جاري الإرسال...";
+}
+
+function getAudioContext() {
+  const C=window.AudioContext||window.webkitAudioContext;
+  if(!C)return null;
+  return new C();
+}
+
+function beep() {
+  try {
+    const c=getAudioContext();
+    if(!c)return;
+    [0,250].forEach(delay=>{
+      const o=c.createOscillator();
+      const g=c.createGain();
+      o.type="square";
+      o.frequency.value=880;
+      g.gain.setValueAtTime(.035,c.currentTime+delay/1000);
+      o.connect(g);
+      g.connect(c.destination);
+      o.start(c.currentTime+delay/1000);
+      o.stop(c.currentTime+delay/1000+.14);
+    });
+    setTimeout(()=>c.close(),700);
+  } catch(e) {}
+}
+
+function nuclearAlarm() {
+  try {
+    const c=getAudioContext();
+    if(!c)return;
+    for(let i=0;i<4;i++) {
+      const start=c.currentTime+i*.75;
+      const o=c.createOscillator();
+      const g=c.createGain();
+      o.type="sawtooth";
+      o.frequency.setValueAtTime(520,start);
+      o.frequency.linearRampToValueAtTime(1050,start+.35);
+      o.frequency.linearRampToValueAtTime(520,start+.7);
+      g.gain.setValueAtTime(.001,start);
+      g.gain.linearRampToValueAtTime(.045,start+.08);
+      g.gain.setValueAtTime(.045,start+.6);
+      g.gain.linearRampToValueAtTime(.001,start+.72);
+      o.connect(g);
+      g.connect(c.destination);
+      o.start(start);
+      o.stop(start+.74);
+    }
+    setTimeout(()=>c.close(),3600);
+  } catch(e) {}
+}
+
+function receive(text) {
+  $("message").textContent=text;
+  $("state").textContent="NEW MESSAGE";
+  $("status").textContent="وصلت رسالة جديدة";
+
+  if(text.startsWith("جمعت النووي خذ طيارة و تعال")) {
+    nuclearAlarm();
+  } else {
+    beep();
+  }
+
+  if(navigator.vibrate)navigator.vibrate(150);
+
+  if("Notification" in window && Notification.permission==="granted") {
+    new Notification("BLACK PAGER",{
+      body:"وصلتك رسالة جديدة: "+text,
+      tag:"black-pager-message"
+    });
+  }
+}
+
+$("addGroup").onclick=addGroup;
 
 $("power").onclick=()=>{
-powered=!powered;
-$("power").textContent=powered?"OFF":"POWER";
-$("state").textContent=powered?"POWER ON":"POWER OFF";
-$("message").textContent=powered?"جاهز لاستقبال الرسائل":"اضغط POWER";
-$("status").textContent=powered?"الجهاز يعمل":"الجهاز مغلق";
+  powered=!powered;
+  $("power").textContent=powered?"OFF":"POWER";
+  $("state").textContent=powered?"POWER ON":"POWER OFF";
+  $("message").textContent=powered?"جاهز لاستقبال الرسائل":"اضغط POWER";
+  $("status").textContent=powered?"الجهاز يعمل":"الجهاز مغلق";
 };
 
 $("enableNotifications").onclick=async()=>{
-  if (!("Notification" in window)) {
+  if(!("Notification" in window)) {
     $("notice").textContent="المتصفح لا يدعم الإشعارات";
     return;
   }
-  const permission = await Notification.requestPermission();
-  $("notice").textContent = permission === "granted"
-    ? "تم تفعيل الإشعارات"
-    : "لم يتم السماح بالإشعارات";
+  const permission=await Notification.requestPermission();
+  $("notice").textContent=permission==="granted"?"تم تفعيل الإشعارات":"لم يتم السماح بالإشعارات";
 };
 
 $("clear").onclick=()=>{
-$("message").textContent=powered?"لا توجد رسائل":"اضغط POWER";
-$("state").textContent=powered?"POWER ON":"POWER OFF";
+  $("message").textContent=powered?"لا توجد رسائل":"اضغط POWER";
+  $("state").textContent=powered?"POWER ON":"POWER OFF";
+};
+
+function renderIndex() {
+  const index=$("index");
+  index.replaceChildren();
+
+  data.forEach((group,gi)=>{
+    const section=document.createElement("div");
+    section.className="index-group";
+
+    const title=document.createElement("div");
+    title.className="index-title";
+    title.textContent=group.title;
+    section.appendChild(title);
+
+    group.items.forEach((item,i)=>{
+      const line=document.createElement("div");
+      line.className="index-item";
+
+      const label=document.createElement("span");
+      label.textContent="بيجر "+(i+1)+": ";
+
+      const meaning=document.createElement("span");
+      meaning.className="meaning";
+      meaning.textContent=meaningsVisible?item.phrase:"***";
+
+      line.append(label,meaning);
+      section.appendChild(line);
+    });
+
+    index.appendChild(section);
+  });
+}
+
+$("showAll").onclick=()=>{
+  meaningsVisible=true;
+  renderIndex();
+};
+
+$("hideAll").onclick=()=>{
+  meaningsVisible=false;
+  renderIndex();
 };
 
 $("indexBtn").onclick=()=>{
-if (!$("index").hidden) {
-  $("index").hidden=true;
-  $("index").innerHTML="";
-  $("pass").value="";
-  $("indexBtn").textContent="فتح الفهرس";
-  return;
-}
+  if(!$("indexArea").hidden) {
+    $("indexArea").hidden=true;
+    $("index").replaceChildren();
+    $("pass").value="";
+    meaningsVisible=false;
+    $("indexBtn").textContent="فتح الفهرس";
+    return;
+  }
 
-if ($("pass").value!=="SAD11") {
-  $("index").hidden=true;
-  $("notice").textContent="كلمة المرور غير صحيحة";
-  return;
-}
+  if($("pass").value!=="SAD11") {
+    $("notice").textContent="كلمة المرور غير صحيحة";
+    return;
+  }
 
-$("index").hidden=false;
-
-$("index").innerHTML=data.map((g,gi) =>
-  "<b>"+g.title+"</b><br>"+
-  g.items.map((x,i)=>
-    "بيجر "+(i+1)+": "+
-    "<span id='meaning-"+gi+"-"+i+"' data-meaning='"+x+"'>***</span> "+
-    "<button type='button' class='eye' data-target='meaning-"+gi+"-"+i+"'>👁️</button>"
-  ).join("<br>")
-).join("<br><br>");
-
-$("index").querySelectorAll(".eye").forEach(btn=>{
-  btn.onclick=()=>{
-    const meaning=$(btn.dataset.target);
-    const visible=btn.dataset.visible==="true";
-    meaning.textContent=visible?"***":meaning.dataset.meaning;
-    btn.dataset.visible=String(!visible);
-    btn.textContent=visible?"👁️":"🙈";
-  };
-});
-
-$("indexBtn").textContent="إغلاق الفهرس";
+  $("indexArea").hidden=false;
+  meaningsVisible=false;
+  renderIndex();
+  $("indexBtn").textContent="إغلاق الفهرس";
 };
 
-function clock(){
-$("clock").textContent=new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
+function clock() {
+  $("clock").textContent=new Date().toLocaleTimeString("en-GB",{
+    hour:"2-digit",minute:"2-digit"
+  });
 }
+
 clock();
 setInterval(clock,1000);
+loadData();
 </script>
 </body>
 </html>
