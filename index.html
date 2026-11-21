@@ -830,14 +830,21 @@ $("indexBtn").onclick = () => {
 
 function clock() {
   const now = new Date();
+  const clockEl = document.getElementById("clock");
+  const dateEl = document.getElementById("dateLabel");
 
-  $("clock").textContent = now.toLocaleTimeString("en-GB", {
-    hour:"2-digit",
-    minute:"2-digit"
-  });
+  if (clockEl) {
+    clockEl.textContent =
+      String(now.getHours()).padStart(2, "0") + ":" +
+      String(now.getMinutes()).padStart(2, "0");
+  }
 
-  $("dateLabel").textContent =
-    now.toLocaleDateString("en-GB");
+  if (dateEl) {
+    dateEl.textContent =
+      String(now.getDate()).padStart(2, "0") + "/" +
+      String(now.getMonth() + 1).padStart(2, "0") + "/" +
+      now.getFullYear();
+  }
 }
 
 clock();
