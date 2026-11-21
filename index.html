@@ -25,6 +25,7 @@ summary{padding:14px;cursor:pointer;color:#b8ce9c;font-weight:bold;font-size:13p
 .panel{max-width:600px;margin:18px auto;background:#131915;border:1px solid #39443c;border-radius:12px;padding:15px}
 input{width:100%;padding:12px;background:#080d0a;color:white;border:1px solid #59635b;border-radius:8px;margin:8px 0}
 .index{font-size:13px;line-height:2}
+.eye{padding:3px 8px;margin:0 4px;font-size:13px;vertical-align:middle}
 @media(max-width:360px){.groups{grid-template-columns:1fr}}
 </style>
 </head>
@@ -187,10 +188,25 @@ if ($("pass").value!=="SAD11") {
 }
 
 $("index").hidden=false;
-$("index").innerHTML=data.map(g =>
+
+$("index").innerHTML=data.map((g,gi) =>
   "<b>"+g.title+"</b><br>"+
-  g.items.map((x,i)=>"بيجر "+(i+1)+": "+x).join("<br>")
+  g.items.map((x,i)=>
+    "بيجر "+(i+1)+": "+
+    "<span id='meaning-"+gi+"-"+i+"' data-meaning='"+x+"'>***</span> "+
+    "<button type='button' class='eye' data-target='meaning-"+gi+"-"+i+"'>👁️</button>"
+  ).join("<br>")
 ).join("<br><br>");
+
+$("index").querySelectorAll(".eye").forEach(btn=>{
+  btn.onclick=()=>{
+    const meaning=$(btn.dataset.target);
+    const visible=btn.dataset.visible==="true";
+    meaning.textContent=visible?"***":meaning.dataset.meaning;
+    btn.dataset.visible=String(!visible);
+    btn.textContent=visible?"👁️":"🙈";
+  };
+});
 
 $("indexBtn").textContent="إغلاق الفهرس";
 };
