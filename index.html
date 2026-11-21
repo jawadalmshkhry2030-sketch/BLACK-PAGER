@@ -423,7 +423,6 @@ socket.on("pager-message", receive);
 socket.on("send-success", () => {
   $("notice").textContent = "تم إرسال الرسالة";
   $("status").textContent = "تم إرسال الرسالة بنجاح";
-  flashPagerScreen();
 });
 socket.on("data-changed", loadData);
 
@@ -597,30 +596,34 @@ async function deleteItem(item) {
 }
 
 function sendPager(group,item) {
-  if(!powered) {
-    $("notice").textContent="شغّل البيجر أولاً";
+  if (!powered) {
+    $("notice").textContent = "شغّل البيجر أولاً";
+    return;
+  }
+
+  if (!socket.connected) {
+    $("notice").textContent = "لا يوجد اتصال بالسيرفر";
+    $("status").textContent = "فشل الإرسال: غير متصل";
     return;
   }
 
   const needsNumber = item.phrase.startsWith("[[N]]");
   let text = needsNumber ? item.phrase.slice(5) : item.phrase;
 
-  if(needsNumber || (group.title==="== ماب النووي ==" && item.phrase==="كمبر عند البيس رقم")) {
+  if (needsNumber || (group.title === "== ماب النووي ==" && item.phrase === "كمبر عند البيس رقم")) {
     const number = prompt("اكتب رقماً من 1 إلى 6:");
-    if(number === null) return;
-    if(!/^[1-6]$/.test(number.trim())) {
+    if (number === null) return;
+    if (!/^[1-6]$/.test(number.trim())) {
       $("notice").textContent = "اختر رقماً من 1 إلى 6";
       return;
     }
     text += " " + number.trim();
   }
 
-  beep();
-  flashPagerScreen();
   $("state").textContent = "SENDING";
   $("status").textContent = "جاري إرسال الرسالة";
-  socket.emit("send-message",text);
-  $("notice").textContent="جاري الإرسال...";
+  $("notice").textContent = "جاري الإرسال...";
+  socket.emit("send-message", text);
 }
 
 let pagerAudioContext = null;
