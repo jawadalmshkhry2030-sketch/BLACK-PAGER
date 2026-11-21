@@ -297,6 +297,7 @@ input{width:100%;padding:12px;background:#080d0a;color:white;border:1px solid #5
 
 <h3 class="section-heading">قوائم البيجر</h3>
 <p style="font-size:12px;color:#aaa">افتح القائمة واضغط البيجر للإرسال مباشرة.</p>
+<button class="add-button" id="refreshGroups" type="button">↻ تحديث القوائم</button>
 <div class="groups" id="groups"></div>
 <div class="note" id="notice"></div>
 
@@ -440,6 +441,17 @@ async function api(url, method="GET", body=null) {
   const result=await response.json().catch(()=>({}));
   if(!response.ok) throw new Error(result.error||"حدث خطأ");
   return result;
+}
+
+const refreshGroups = document.getElementById("refreshGroups");
+if (refreshGroups) {
+  refreshGroups.addEventListener("click", async () => {
+    refreshGroups.disabled = true;
+    refreshGroups.textContent = "جاري التحديث...";
+    await loadData();
+    refreshGroups.disabled = false;
+    refreshGroups.textContent = "↻ تحديث القوائم";
+  });
 }
 
 async function loadData() {
