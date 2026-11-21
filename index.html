@@ -109,6 +109,40 @@ input{width:100%;padding:12px;background:#080d0a;color:white;border:1px solid #5
   color:#d4f2b7;
 }
 
+
+.screen-status {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:5px;
+  flex-wrap:wrap;
+  font-size:9px;
+  font-weight:bold;
+  border-bottom:1px solid #71835d;
+  padding-bottom:5px;
+}
+.screen-status .online { color:#174c19; }
+.screen-status .offline { color:#8b2424; }
+.screen-status .new-message {
+  color:#8b1010;
+  animation:msgBlink .65s steps(2,start) infinite;
+}
+#pagerScreen.flash {
+  animation:screenFlash .35s ease-in-out 3;
+}
+@keyframes msgBlink {
+  to { opacity:.25; }
+}
+@keyframes screenFlash {
+  50% {
+    background:#d9edb5;
+    box-shadow:inset 0 0 25px #fff;
+  }
+}
+@media(max-width:380px) {
+  .screen-status { font-size:8px; gap:3px; }
+}
+
 </style>
 </head>
 <body>
@@ -116,9 +150,15 @@ input{width:100%;padding:12px;background:#080d0a;color:white;border:1px solid #5
 
 <section class="device">
 <div class="brand">⛨ THE GHOST'S ⛨</div>
-<div class="screen">
+<div class="screen" id="pagerScreen">
 <div class="top"><span id="state">POWER OFF</span><div class="wave-controls"><span id="waveLabel">WAVE 01</span><button type="button" id="wavePrev" class="wave-next" aria-label="الموجة السابقة">↓</button>
 <button type="button" id="waveNext" class="wave-next" aria-label="الموجة التالية">↑</button></div></div>
+<div class="screen-status">
+<span id="dateLabel">--/--/----</span>
+<span id="signalIndicator" class="offline">LINK OFF</span>
+<span id="batteryIndicator">BAT --</span>
+<span id="alertIndicator">MSG STBY</span>
+</div>
 <div class="message" id="message">اضغط POWER</div>
 <div class="bottom"><span>BLACK PAGER</span><span id="clock">--:--</span></div>
 </div>
@@ -162,6 +202,64 @@ input{width:100%;padding:12px;background:#080d0a;color:white;border:1px solid #5
 const socket = io();
 
 const $ = id => document.getElementById(id);
+
+function updateLinkIndicator() {
+  const label = $("signalIndicator");
+  if (!label) return;
+
+  const online = socket.connected;
+  label.textContent = online ? "LINK ONLINE" : "LINK OFF";
+  label.className = online ? "online" : "offline";
+}
+
+function updateBatteryIndicator() {
+  const label = $("batteryIndicator");
+  if (!label) return;
+
+  if (!navigator.getBattery) {
+    label.textContent = "BAT --";
+    return;
+  }
+
+  navigator.getBattery().then(battery => {
+    const update = () => {
+      label.textContent = "BAT " +
+        Math.round(battery.level * 100) + "%" +
+        (battery.charging ? " +" : "");
+    };
+
+    update();
+    battery.addEventListener("levelchange", update);
+    battery.addEventListener("chargingchange", update);
+  }).catch(() => {
+    label.textContent = "BAT --";
+  });
+}
+
+function setMessageIndicator(isNew) {
+  const label = $("alertIndicator");
+  if (!label) return;
+
+  label.textContent = isNew ? "MSG NEW" : "MSG STBY";
+  label.classList.toggle("new-message", isNew);
+}
+
+function flashPagerScreen() {
+  const screen = $("pagerScreen");
+  if (!screen) return;
+
+  screen.classList.remove("flash");
+  void screen.offsetWidth;
+  screen.classList.add("flash");
+
+  setTimeout(() => {
+    screen.classList.remove("flash");
+  }, 1100);
+}
+
+socket.on("connect", updateLinkIndicator);
+socket.on("disconnect", updateLinkIndicator);
+
 
 function changeWave(direction) {
   currentWave = ((currentWave - 1 + direction + totalWaves) % totalWaves) + 1;
@@ -404,6 +502,8 @@ function receive(text) {
   $("message").textContent=text;
   $("state").textContent="NEW MESSAGE";
   $("status").textContent="وصلت رسالة جديدة";
+  setMessageIndicator(true);
+  flashPagerScreen();
 
   if(text.startsWith("جمعت النووي خذ طيارة و تعال")) {
     nuclearAlarm();
@@ -429,6 +529,8 @@ $("power").onclick=()=>{
   $("state").textContent=powered?"POWER ON":"POWER OFF";
   $("message").textContent=powered?"جاهز لاستقبال الرسائل":"اضغط POWER";
   $("status").textContent=powered?"الجهاز يعمل":"الجهاز مغلق";
+  setMessageIndicator(false);
+  $("pagerScreen").classList.remove("flash");
 };
 
 $("enableNotifications").onclick=async()=>{
@@ -443,6 +545,8 @@ $("enableNotifications").onclick=async()=>{
 $("clear").onclick=()=>{
   $("message").textContent=powered?"لا توجد رسائل":"اضغط POWER";
   $("state").textContent=powered?"POWER ON":"POWER OFF";
+  setMessageIndicator(false);
+  $("pagerScreen").classList.remove("flash");
 };
 
 function renderIndex() {
@@ -528,13 +632,22 @@ $("indexBtn").onclick = () => {
 };
 
 function clock() {
-  $("clock").textContent=new Date().toLocaleTimeString("en-GB",{
-    hour:"2-digit",minute:"2-digit"
+  const now = new Date();
+
+  $("clock").textContent = now.toLocaleTimeString("en-GB", {
+    hour:"2-digit",
+    minute:"2-digit"
   });
+
+  $("dateLabel").textContent =
+    now.toLocaleDateString("en-GB");
 }
 
 clock();
 setInterval(clock,1000);
+updateLinkIndicator();
+updateBatteryIndicator();
+setMessageIndicator(false);
 loadData();
 </script>
 <style>
