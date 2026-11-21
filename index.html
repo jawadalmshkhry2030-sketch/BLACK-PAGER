@@ -246,6 +246,45 @@ input{width:100%;padding:12px;background:#080d0a;color:white;border:1px solid #5
 .volume-panel button { min-width:42px; }
 .volume-panel span { min-width:75px;text-align:center;font-size:12px; }
 
+
+/* BLACK PAGER welcome boot */
+.screen { position:relative; overflow:hidden; }
+.screen.off {
+  background:#030503 !important;
+  color:transparent !important;
+  box-shadow:inset 0 0 18px #000 !important;
+}
+.screen.off > :not(#welcomeBoot),
+.screen.booting > :not(#welcomeBoot) {
+  visibility:hidden !important;
+}
+.welcome-boot {
+  position:absolute;
+  inset:0;
+  z-index:20;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#a9bd8c;
+  color:#172313;
+  overflow:hidden;
+}
+.welcome-boot[hidden] { display:none !important; }
+.welcome-boot span {
+  font-family:monospace;
+  font-size:clamp(23px, 7vw, 34px);
+  font-weight:900;
+  letter-spacing:5px;
+  text-shadow:2px 0 #70875b, -2px 0 #d2e2b8;
+  clip-path:inset(0 100% 0 0);
+  animation:welcomePixel 1.8s steps(12,end) forwards;
+}
+@keyframes welcomePixel {
+  0% { clip-path:inset(0 100% 0 0); opacity:.25; }
+  35% { opacity:.65; }
+  100% { clip-path:inset(0 0 0 0); opacity:1; }
+}
+
 </style>
 </head>
 <body>
@@ -254,6 +293,7 @@ input{width:100%;padding:12px;background:#080d0a;color:white;border:1px solid #5
 <section class="device">
 <div class="brand">⛨ THE GHOST'S ⛨</div>
 <div class="screen" id="pagerScreen">
+<div class="welcome-boot" id="welcomeBoot" hidden><span>WELCOME</span></div>
 <div class="top"><span id="state">POWER OFF</span><div class="wave-controls"><span id="waveLabel">WAVE 01</span><button type="button" id="wavePrev" class="wave-next" aria-label="الموجة السابقة">↓</button>
 <button type="button" id="waveNext" class="wave-next" aria-label="الموجة التالية">↑</button></div></div>
 <div class="screen-status">
@@ -661,9 +701,72 @@ function updatePowerUI() {
   $("pagerScreen").classList.remove("flash");
 }
 
+function playWelcomeSound() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const notes = [
+      { f: 523.25, t: 0.00, d: 0.22 },
+      { f: 659.25, t: 0.24, d: 0.22 },
+      { f: 783.99, t: 0.48, d: 0.28 },
+      { f: 1046.5, t: 0.82, d: 0.55 }
+    ];
+    notes.forEach(n => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "square";
+      osc.frequency.value = n.f;
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime + n.t);
+      gain.gain.exponentialRampToValueAtTime(0.045, ctx.currentTime + n.t + 0.025);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + n.t + n.d);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + n.t);
+      osc.stop(ctx.currentTime + n.t + n.d + 0.02);
+    });
+    setTimeout(() => ctx.close().catch(() => {}), 2200);
+  } catch (e) {
+    console.warn("Welcome sound unavailable:", e);
+  }
+}
+
+let welcomeTimer = null;
+
+function startWelcomeSequence() {
+  const screen = $("pagerScreen");
+  const welcome = $("welcomeBoot");
+  if (welcomeTimer) clearTimeout(welcomeTimer);
+
+  screen.classList.remove("off");
+  screen.classList.add("booting");
+  welcome.hidden = false;
+  playWelcomeSound();
+
+  welcomeTimer = setTimeout(() => {
+    welcome.hidden = true;
+    screen.classList.remove("booting");
+    welcomeTimer = null;
+    updatePowerUI();
+  }, 5000);
+}
+
 $("power").onclick = () => {
-  powered = !powered;
+  if (powered) {
+    powered = false;
+    if (welcomeTimer) {
+      clearTimeout(welcomeTimer);
+      welcomeTimer = null;
+    }
+    $("welcomeBoot").hidden = true;
+    $("pagerScreen").classList.remove("booting");
+    updatePowerUI();
+    return;
+  }
+
+  powered = true;
   updatePowerUI();
+  startWelcomeSequence();
 };
 
 function updateNotificationUI() {
