@@ -4,6 +4,7 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const path = require("path");
+const setupAdmin = require("./admin-system");
 
 const app = express();
 app.use("/sounds", express.static(path.join(__dirname, "public")));
@@ -19,6 +20,8 @@ if (!URL || !KEY) {
   console.error("Missing Supabase environment variables");
   process.exit(1);
 }
+
+setupAdmin(app, io, URL);
 
 async function db(table, options = {}) {
   const response = await fetch(
@@ -182,7 +185,7 @@ io.on("connection", (socket) => {
   socket.on("join-wave", (wave) => {
     const nextWave = Number(wave);
 
-    if (!Number.isInteger(nextWave) || nextWave < 1 || nextWave > 6) {
+    if (!Number.isInteger(nextWave) || nextWave < 1 || nextWave > 50) {
       return;
     }
 

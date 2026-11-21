@@ -1,2 +1,15 @@
-node_modules
-.env
+node_modules/
+.env*
+*.pre-admin
+*.bak
+*.before-custom
+*.wave-backup
+*.before-waves50
+
+# Local backups and patch scripts
+*.before-admin-panel
+*.before-volume
+*.before-admin-install
+*.before-admin-link
+patch-pager-admin.js
+admin-panel.html

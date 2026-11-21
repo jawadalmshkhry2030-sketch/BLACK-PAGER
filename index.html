@@ -50,7 +50,8 @@ input{width:100%;padding:12px;background:#080d0a;color:white;border:1px solid #5
 <section class="device">
 <div class="brand">⛨ THE GHOST'S ⛨</div>
 <div class="screen">
-<div class="top"><span id="state">POWER OFF</span><div class="wave-controls"><span id="waveLabel">WAVE 01</span><button type="button" id="waveNext" class="wave-next" aria-label="تغيير الموجة">↑</button></div></div>
+<div class="top"><span id="state">POWER OFF</span><div class="wave-controls"><span id="waveLabel">WAVE 01</span><button type="button" id="wavePrev" class="wave-next" aria-label="الموجة السابقة">↓</button>
+<button type="button" id="waveNext" class="wave-next" aria-label="الموجة التالية">↑</button></div></div>
 <div class="message" id="message">اضغط POWER</div>
 <div class="bottom"><span>BLACK PAGER</span><span id="clock">--:--</span></div>
 </div>
@@ -58,6 +59,9 @@ input{width:100%;padding:12px;background:#080d0a;color:white;border:1px solid #5
 <button class="power" id="power">POWER</button>
 <button id="clear">مسح الشاشة</button>
 <button id="enableNotifications">تفعيل الإشعارات</button>
+<button id="volumeDown" type="button">−</button>
+<span id="volumeLabel" style="align-self:center;font-size:12px">الصوت 70%</span>
+<button id="volumeUp" type="button">+</button>
 </div>
 <div class="note" id="status">الجهاز مغلق</div>
 </section>
@@ -92,20 +96,39 @@ const socket = io();
 
 const $ = id => document.getElementById(id);
 
-$("waveNext").onclick = () => {
-  currentWave = currentWave % totalWaves + 1;
+function changeWave(direction) {
+  currentWave = ((currentWave - 1 + direction + totalWaves) % totalWaves) + 1;
   $("waveLabel").textContent = "WAVE " + String(currentWave).padStart(2, "0");
   $("notice").textContent = "جاري تغيير الموجة...";
   socket.emit("join-wave", currentWave);
-};
+}
+$("waveNext").onclick = () => changeWave(1);
+$("wavePrev").onclick = () => changeWave(-1);
 
 
 let powered = false;
 let currentWave = 1;
-const totalWaves = 6;
+const totalWaves = 50;
 let data = [];
 const visibleMeaningIds = new Set();
 let loading = false;
+let pagerVolume = Number(localStorage.getItem("pagerVolume"));
+if (!Number.isFinite(pagerVolume)) pagerVolume = 0.7;
+pagerVolume = Math.max(0, Math.min(1, pagerVolume));
+
+function updateVolume() {
+  $("volumeLabel").textContent = "الصوت " + Math.round(pagerVolume * 100) + "%";
+  localStorage.setItem("pagerVolume", String(pagerVolume));
+}
+$("volumeUp").onclick = () => {
+  pagerVolume = Math.min(1, Math.round((pagerVolume + 0.1) * 10) / 10);
+  updateVolume();
+};
+$("volumeDown").onclick = () => {
+  pagerVolume = Math.max(0, Math.round((pagerVolume - 0.1) * 10) / 10);
+  updateVolume();
+};
+updateVolume();
 
 socket.on("pager-message", receive);
 socket.on("send-success", () => {
@@ -295,7 +318,7 @@ function beep() {
       const g=c.createGain();
       o.type="square";
       o.frequency.value=880;
-      g.gain.setValueAtTime(.035,c.currentTime+delay/1000);
+      g.gain.setValueAtTime(.035 * pagerVolume,c.currentTime+delay/1000);
       o.connect(g);
       g.connect(c.destination);
       o.start(c.currentTime+delay/1000);
@@ -307,7 +330,7 @@ function beep() {
 
 function nuclearAlarm() {
   const alarm = new Audio("/sounds/nuclear-alarm.mp3");
-  alarm.volume = 1;
+  alarm.volume = pagerVolume;
   alarm.play().catch(error => {
     console.error("Alarm playback error:", error);
   });
@@ -450,5 +473,284 @@ clock();
 setInterval(clock,1000);
 loadData();
 </script>
+<style>
+#adminEntry {
+  display:none;
+  margin:14px auto;
+  padding:12px;
+  width:min(92%,420px);
+  color:#00ff88;
+  background:#080d0a;
+  border:1px solid #087c48;
+  border-radius:8px;
+  text-align:center;
+  font-family:monospace;
+}
+#adminEntry button,#adminEntry input,#adminEntry select {
+  box-sizing:border-box;
+  width:100%;
+  margin:5px 0;
+  padding:10px;
+  background:#101a14;
+  color:#00ff88;
+  border:1px solid #087c48;
+  border-radius:5px;
+}
+#adminPanel {
+  display:none;
+  position:fixed;
+  inset:4%;
+  z-index:9999;
+  overflow:auto;
+  padding:16px;
+  color:#00ff88;
+  background:#050907;
+  border:1px solid #00a85a;
+  border-radius:10px;
+  font-family:monospace;
+}
+#adminPanel button,#adminPanel select {
+  padding:9px;
+  margin:5px;
+  color:#00ff88;
+  background:#101a14;
+  border:1px solid #087c48;
+  border-radius:5px;
+}
+.admin-device {
+  padding:10px;
+  margin:7px 0;
+  border:1px solid #174d32;
+  border-radius:6px;
+  overflow-wrap:anywhere;
+}
+</style>
+
+<div id="adminEntry">
+  <button id="adminOpen">لوحة الإشراف</button>
+  <div id="ownerClaim" style="display:none">
+    <p>تسجيل جهاز المالك</p>
+    <input id="ownerPassword" type="password" placeholder="كلمة مرور الإدارة">
+    <button id="claimOwner">تسجيل كمالك</button>
+  </div>
+  <p id="adminMessage"></p>
+</div>
+
+<div id="adminPanel">
+  <h3>لوحة الإشراف</h3>
+  <p id="adminRole"></p>
+  <button id="adminClose">إغلاق</button>
+  <button id="adminRefresh">تحديث القائمة</button>
+  <hr>
+  <h4>الأعضاء المتصلون</h4>
+  <div id="onlineDevices"></div>
+  <div id="ownerTools" style="display:none">
+    <hr>
+    <h4>إضافة إداري</h4>
+    <select id="deviceSelect">
+      <option value="">اختر جهازاً متصلاً</option>
+    </select>
+    <button id="addAdmin">إضافة الجهاز كإداري</button>
+    <h4>الإداريون</h4>
+    <div id="adminDevices"></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const deviceKey = "blackPagerDeviceId";
+  let deviceId = localStorage.getItem(deviceKey);
+
+  if (!deviceId) {
+    deviceId = crypto.randomUUID();
+    localStorage.setItem(deviceKey, deviceId);
+  }
+
+  const tokenKey = "blackPagerAdminToken";
+  let adminToken = localStorage.getItem(tokenKey) || "";
+  let adminRole = null;
+
+  const entry = $("adminEntry");
+  const message = $("adminMessage");
+
+  async function request(url, method="GET", body=null) {
+    const options = {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        "x-device-id": deviceId,
+        "x-admin-token": adminToken
+      }
+    };
+    if (body) options.body = JSON.stringify(body);
+
+    const response = await fetch(url, options);
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || "تعذر تنفيذ الطلب");
+    return data;
+  }
+
+  async function checkStatus() {
+    try {
+      const status = await request("/api/admin/status");
+      $("ownerClaim").style.display =
+        !status.claimed ? "block" : "none";
+
+      adminRole = status.role;
+
+      if (adminRole) {
+        entry.style.display = "block";
+        $("adminOpen").style.display = "block";
+        $("adminMessage").textContent = "تم التحقق من صلاحية الجهاز";
+      } else if (!status.claimed) {
+        entry.style.display = "block";
+        $("adminOpen").style.display = "none";
+      } else {
+        entry.style.display = "none";
+      }
+    } catch (error) {
+      message.textContent = error.message;
+    }
+  }
+
+  async function loadPanel() {
+    try {
+      const data = await request("/api/admin/panel");
+      $("adminRole").textContent =
+        data.role === "owner" ? "الصلاحية: المالك" : "الصلاحية: إداري";
+
+      $("ownerTools").style.display =
+        data.role === "owner" ? "block" : "none";
+
+      const online = $("onlineDevices");
+      const select = $("deviceSelect");
+      online.replaceChildren();
+      select.replaceChildren(new Option("اختر جهازاً متصلاً", ""));
+
+      const seen = new Set();
+
+      data.online.forEach(device => {
+        const key = device.deviceId;
+        const line = document.createElement("div");
+        line.className = "admin-device";
+        line.textContent =
+          "الموجة: " + device.wave +
+          " | الصلاحية: " + device.role +
+          " | الجهاز: " + key;
+        online.appendChild(line);
+
+        if (device.role === "member" && !seen.has(key)) {
+          seen.add(key);
+          select.add(new Option(
+            "WAVE " + String(device.wave).padStart(2, "0") +
+            " - " + key,
+            key
+          ));
+        }
+      });
+
+      const admins = $("adminDevices");
+      admins.replaceChildren();
+
+      data.admins.forEach(device => {
+        const line = document.createElement("div");
+        line.className = "admin-device";
+        line.textContent = device.role + " | " + device.deviceId +
+          (device.online ? " | متصل" : " | غير متصل");
+
+        if (data.role === "owner" && device.role === "admin") {
+          const remove = document.createElement("button");
+          remove.textContent = "إزالة";
+          remove.onclick = async () => {
+            try {
+              await request(
+                "/api/admin/remove/" + encodeURIComponent(device.deviceId),
+                "DELETE"
+              );
+              await loadPanel();
+            } catch (e) {
+              alert(e.message);
+            }
+          };
+          line.appendChild(remove);
+        }
+
+        admins.appendChild(line);
+      });
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+
+  $("claimOwner").onclick = async () => {
+    try {
+      const result = await request("/api/admin/claim", "POST", {
+        password: $("ownerPassword").value
+      });
+      adminToken = result.token;
+      localStorage.setItem(tokenKey, adminToken);
+      $("ownerPassword").value = "";
+      await checkStatus();
+      alert("تم تسجيل جهاز المالك");
+    } catch (error) {
+      alert(error.message);
+    }
+  };
+
+  $("adminOpen").onclick = async () => {
+    $("adminPanel").style.display = "block";
+    await loadPanel();
+  };
+
+  $("adminClose").onclick = () => {
+    $("adminPanel").style.display = "none";
+  };
+
+  $("adminRefresh").onclick = loadPanel;
+
+  $("addAdmin").onclick = async () => {
+    const selected = $("deviceSelect").value;
+    if (!selected) return alert("اختر جهازاً أولاً");
+
+    try {
+      await request("/api/admin/add", "POST", {
+        deviceId: selected
+      });
+      alert("تمت إضافة الإداري");
+      await loadPanel();
+    } catch (error) {
+      alert(error.message);
+    }
+  };
+
+  if (typeof socket !== "undefined") {
+    socket.on("connect", () => {
+      socket.emit("register-device", deviceId);
+    });
+
+    socket.on("admin-granted", data => {
+      adminToken = data.token;
+      localStorage.setItem(tokenKey, adminToken);
+      checkStatus();
+    });
+
+    socket.on("admin-revoked", () => {
+      adminToken = "";
+      localStorage.removeItem(tokenKey);
+      adminRole = null;
+      $("adminPanel").style.display = "none";
+      checkStatus();
+    });
+
+    socket.on("admin-online-changed", () => {
+      if ($("adminPanel").style.display === "block") loadPanel();
+    });
+  }
+
+  checkStatus();
+})();
+</script>
+
 </body>
 </html>
