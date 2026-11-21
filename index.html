@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BLACK PAGER</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#090b0a;color:#eee;font-family:Tahoma,Arial;padding:18px}
+h1{text-align:center;letter-spacing:4px}
+.device{max-width:520px;width:100%;margin:20px auto;background:linear-gradient(145deg,#444,#111 45%,#050505);border:2px solid #555;border-radius:28px;padding:18px;box-shadow:0 15px 35px #000}
+.brand{text-align:center;color:#aaa;font-size:11px;letter-spacing:4px;margin-bottom:15px}
+.screen{background:#a9bd8c;color:#111;border:8px solid #080b09;border-radius:5px;height:155px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:inset 0 0 15px #526341}
+.top,.bottom{display:flex;justify-content:space-between;font-size:10px;font-weight:bold}
+.message{text-align:center;font-size:20px;font-weight:bold;overflow-wrap:anywhere}
+.controls{display:flex;justify-content:center;gap:18px;margin:16px}
+button{cursor:pointer;background:#252b27;color:white;border:1px solid #59635b;border-radius:10px;padding:11px;font-family:inherit}
+.power{width:52px;height:52px;border-radius:50%;font-size:11px}
+.groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:15px}
+.group{background:#131915;border:1px solid #39443c;border-radius:12px;overflow:hidden}
+summary{padding:14px;cursor:pointer;color:#b8ce9c;font-weight:bold;font-size:13px}
+.pagers{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;padding:0 9px 10px}
+.pagers button{font-size:12px}
+.note{text-align:center;color:#b8ce9c;font-size:12px;margin:12px}
+.panel{max-width:600px;margin:18px auto;background:#131915;border:1px solid #39443c;border-radius:12px;padding:15px}
+input{width:100%;padding:12px;background:#080d0a;color:white;border:1px solid #59635b;border-radius:8px;margin:8px 0}
+.index{font-size:13px;line-height:2}
+@media(max-width:360px){.groups{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<h1>BLACK PAGER</h1>
+
+<section class="device">
+<div class="brand">THE GHOST'S</div>
+<div class="screen">
+<div class="top"><span id="state">POWER OFF</span><span>▰▰▰</span></div>
+<div class="message" id="message">اضغط POWER</div>
+<div class="bottom"><span>BLACK PAGER</span><span id="clock">--:--</span></div>
+</div>
+<div class="controls">
+<button class="power" id="power">POWER</button>
+<button id="clear">مسح الشاشة</button>
+<button id="enableNotifications">تفعيل الإشعارات</button>
+</div>
+<div class="note" id="status">الجهاز مغلق</div>
+</section>
+
+<h3>قوائم البيجر</h3>
+<p style="font-size:12px;color:#aaa">افتح القائمة واضغط رقم البيجر للإرسال مباشرة.</p>
+<div class="groups" id="groups"></div>
+<div class="note" id="notice"></div>
+
+<section class="panel">
+<h3>الفهرس</h3>
+<input id="pass" type="password" placeholder="كلمة المرور">
+<button style="width:100%" id="indexBtn">فتح الفهرس</button>
+<div class="index" id="index" hidden></div>
+</section>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+
+socket.on("pager-message", receive);
+socket.on("send-success", () => {
+  $("notice").textContent = "تم إرسال الرسالة";
+});
+
+const data=[
+{title:"== الحياة الواقعيه ==",items:["اهلي عندي","حسيت اني بطفي","نقلب على الشخص","اعطي ميوت للشخص","شوف الخاص"]},
+{title:"== التواصل ==",items:["اي","لا","ممكن","بكيفك","تعال","كومبو"]},
+{title:"== مابات اخرى ==",items:["نتحالف","نخرب"]},
+{title:"== ماب النووي ==",items:["جمعت النووي خذ طيارة و تعال","حركة السبام بالصواريخ","كمبر عند البيس رقم"]}
+];
+
+let powered=false;
+const $=id=>document.getElementById(id);
+
+function beep(){
+try{
+const C=AudioContext||webkitAudioContext;
+const c=new C(),o=c.createOscillator(),g=c.createGain();
+o.frequency.value=880;
+g.gain.value=.04;
+o.connect(g);g.connect(c.destination);
+o.start();
+setTimeout(()=>o.stop(),140);
+setTimeout(()=>{
+  const o2=c.createOscillator();
+  o2.frequency.value=880;
+  o2.connect(g);
+  o2.start();
+  setTimeout(()=>{o2.stop();c.close()},140);
+},230);
+}catch(e){}
+}
+
+function receive(text){
+$("message").textContent=text;
+$("state").textContent="NEW MESSAGE";
+$("status").textContent="وصلت رسالة جديدة";
+beep();
+if(navigator.vibrate)navigator.vibrate(150);
+
+if ("Notification" in window && Notification.permission === "granted") {
+  new Notification("BLACK PAGER", {
+    body: "وصلتك رسالة جديدة: " + text,
+    tag: "black-pager-message"
+  });
+}
+}
+
+data.forEach((group,gi)=>{
+const box=document.createElement("details");
+box.className="group";
+const summary=document.createElement("summary");
+summary.textContent=group.title;
+box.appendChild(summary);
+
+const row=document.createElement("div");
+row.className="pagers";
+
+group.items.forEach((phrase,i)=>{
+const btn=document.createElement("button");
+btn.textContent="بيجر "+(i+1);
+btn.onclick=()=>{
+if(!powered){$("notice").textContent="شغّل البيجر أولاً";return;}
+let text=phrase;
+
+if(gi===3&&i===2){
+const number=prompt("اختر رقم البيس من 1 إلى 6");
+if(number===null)return;
+if(!/^[1-6]$/.test(number)){
+$("notice").textContent="اختر رقماً من 1 إلى 6";
+return;
+}
+text+=" "+number;
+}
+socket.emit("send-message", text);
+$("notice").textContent="جاري الإرسال...";
+};
+row.appendChild(btn);
+});
+
+box.appendChild(row);
+$("groups").appendChild(box);
+});
+
+$("power").onclick=()=>{
+powered=!powered;
+$("power").textContent=powered?"OFF":"POWER";
+$("state").textContent=powered?"POWER ON":"POWER OFF";
+$("message").textContent=powered?"جاهز لاستقبال الرسائل":"اضغط POWER";
+$("status").textContent=powered?"الجهاز يعمل":"الجهاز مغلق";
+};
+
+$("enableNotifications").onclick=async()=>{
+  if (!("Notification" in window)) {
+    $("notice").textContent="المتصفح لا يدعم الإشعارات";
+    return;
+  }
+  const permission = await Notification.requestPermission();
+  $("notice").textContent = permission === "granted"
+    ? "تم تفعيل الإشعارات"
+    : "لم يتم السماح بالإشعارات";
+};
+
+$("clear").onclick=()=>{
+$("message").textContent=powered?"لا توجد رسائل":"اضغط POWER";
+$("state").textContent=powered?"POWER ON":"POWER OFF";
+};
+
+$("indexBtn").onclick=()=>{
+if (!$("index").hidden) {
+  $("index").hidden=true;
+  $("index").innerHTML="";
+  $("pass").value="";
+  $("indexBtn").textContent="فتح الفهرس";
+  return;
+}
+
+if ($("pass").value!=="SAD11") {
+  $("index").hidden=true;
+  $("notice").textContent="كلمة المرور غير صحيحة";
+  return;
+}
+
+$("index").hidden=false;
+$("index").innerHTML=data.map(g =>
+  "<b>"+g.title+"</b><br>"+
+  g.items.map((x,i)=>"بيجر "+(i+1)+": "+x).join("<br>")
+).join("<br><br>");
+
+$("indexBtn").textContent="إغلاق الفهرس";
+};
+
+function clock(){
+$("clock").textContent=new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
+}
+clock();
+setInterval(clock,1000);
+</script>
+</body>
+</html>
