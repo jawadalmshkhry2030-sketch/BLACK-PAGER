@@ -175,6 +175,23 @@ app.delete("/api/items/:id", async (req, res) => {
 
 io.on("connection", (socket) => {
   let lastMessage = 0;
+  let currentWave = 1;
+
+  socket.join("wave-" + currentWave);
+
+  socket.on("join-wave", (wave) => {
+    const nextWave = Number(wave);
+
+    if (!Number.isInteger(nextWave) || nextWave < 1 || nextWave > 6) {
+      return;
+    }
+
+    socket.leave("wave-" + currentWave);
+    currentWave = nextWave;
+    socket.join("wave-" + currentWave);
+
+    socket.emit("wave-joined", currentWave);
+  });
 
   socket.on("send-message", (message) => {
     if (typeof message !== "string") return;
@@ -184,7 +201,7 @@ io.on("connection", (socket) => {
     if (now - lastMessage < 700) return;
     lastMessage = now;
 
-    socket.broadcast.emit("pager-message", message);
+    socket.to("wave-" + currentWave).emit("pager-message", message);
     socket.emit("send-success");
   });
 });

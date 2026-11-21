@@ -95,6 +95,8 @@ const $ = id => document.getElementById(id);
 $("waveNext").onclick = () => {
   currentWave = currentWave % totalWaves + 1;
   $("waveLabel").textContent = "WAVE " + String(currentWave).padStart(2, "0");
+  $("notice").textContent = "جاري تغيير الموجة...";
+  socket.emit("join-wave", currentWave);
 };
 
 
@@ -110,6 +112,14 @@ socket.on("send-success", () => {
   $("notice").textContent = "تم إرسال الرسالة";
 });
 socket.on("data-changed", loadData);
+
+socket.on("connect", () => {
+  socket.emit("join-wave", currentWave);
+});
+
+socket.on("wave-joined", (wave) => {
+  $("notice").textContent = "تم الاتصال بالموجة WAVE " + String(wave).padStart(2, "0");
+});
 
 async function api(url, method="GET", body=null) {
   const options = {method,headers:{"Content-Type":"application/json"}};
