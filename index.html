@@ -231,14 +231,43 @@ async function addGroup() {
 }
 
 async function addItem(group) {
-  const phrase=prompt("اكتب عبارة البيجر الجديدة:");
-  if(phrase===null)return;
-  if(!phrase.trim())return alert("اكتب عبارة البيجر");
+  const mode = prompt("طريقة إضافة البيجر:\n1 - مع عدد\n2 - بدون عدد");
+  if (mode === null) return;
+  if (mode !== "1" && mode !== "2") {
+    return alert("اختر 1 أو 2");
+  }
+
+  const phrase = prompt("اكتب عبارة البيجر:");
+  if (phrase === null) return;
+  if (!phrase.trim()) return alert("اكتب عبارة البيجر");
+
+  let finalPhrase = phrase.trim();
+
+  if (mode === "1") {
+    const number = prompt("اكتب العدد:");
+    if (number === null) return;
+    if (!/^\\d{1,6}$/.test(number.trim())) {
+      return alert("اكتب عدداً صحيحاً");
+    }
+    finalPhrase += " رقم " + number.trim();
+  }
+
+  if (finalPhrase.length > 200) {
+    return alert("العبارة طويلة جداً");
+  }
+
+  if (!confirm("نشر البيجر التالي؟\\n\\n" + finalPhrase)) return;
+
   try {
-    await api("/api/items","POST",{phrase:phrase.trim(),group_id:group.id});
+    await api("/api/items", "POST", {
+      phrase: finalPhrase,
+      group_id: group.id
+    });
     await loadData();
-    $("notice").textContent="تمت إضافة البيجر";
-  } catch(error){alert(error.message);}
+    $("notice").textContent = "تم نشر البيجر";
+  } catch(error) {
+    alert(error.message);
+  }
 }
 
 async function editGroup(group) {
