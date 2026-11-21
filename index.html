@@ -400,6 +400,7 @@ const totalWaves = 50;
 let data = [];
 const visibleMeaningIds = new Set();
 let loading = false;
+let reloadPending = false;
 let pagerVolume = Number(localStorage.getItem("pagerVolume"));
 if (!Number.isFinite(pagerVolume)) pagerVolume = 0.7;
 pagerVolume = Math.max(0, Math.min(1, pagerVolume));
@@ -435,28 +436,44 @@ socket.on("wave-joined", (wave) => {
 async function api(url, method="GET", body=null) {
   const options = {method,headers:{"Content-Type":"application/json"}};
   if(body) options.body=JSON.stringify(body);
-  const response=await fetch(url,options);
+  const response=await fetch(url,{...options,cache:"no-store"});
   const result=await response.json().catch(()=>({}));
   if(!response.ok) throw new Error(result.error||"حدث خطأ");
   return result;
 }
 
 async function loadData() {
-  if(loading)return;
-  loading=true;
+  if (loading) {
+    reloadPending = true;
+    return;
+  }
+
+  loading = true;
   try {
-    const result=await api("/api/data");
-    data=result.groups.map(group=>({
+    const result = await api("/api/data");
+
+    if (!Array.isArray(result.groups) || !Array.isArray(result.items)) {
+      throw new Error("بيانات القوائم غير مكتملة");
+    }
+
+    data = result.groups.map(group => ({
       ...group,
-      items:result.items.filter(item=>item.group_id===group.id)
+      items: result.items.filter(item => item.group_id === group.id)
     }));
+
     renderGroups();
-    if(!$("indexArea").hidden)renderIndex();
-    $("notice").textContent="";
-  } catch(error) {
-    $("notice").textContent="تعذر تحميل القوائم: "+error.message;
+
+    if (!$("indexArea").hidden) renderIndex();
+    $("notice").textContent = "";
+  } catch (error) {
+    $("notice").textContent = "تعذر تحميل القوائم: " + error.message;
   } finally {
-    loading=false;
+    loading = false;
+
+    if (reloadPending) {
+      reloadPending = false;
+      void loadData();
+    }
   }
 }
 
