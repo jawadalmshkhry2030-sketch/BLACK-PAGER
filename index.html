@@ -284,27 +284,64 @@ function beep() {
 
 function nuclearAlarm() {
   try {
-    const c=getAudioContext();
-    if(!c)return;
-    for(let i=0;i<4;i++) {
-      const start=c.currentTime+i*.75;
-      const o=c.createOscillator();
-      const g=c.createGain();
-      o.type="sawtooth";
-      o.frequency.setValueAtTime(520,start);
-      o.frequency.linearRampToValueAtTime(1050,start+.35);
-      o.frequency.linearRampToValueAtTime(520,start+.7);
-      g.gain.setValueAtTime(.001,start);
-      g.gain.linearRampToValueAtTime(.045,start+.08);
-      g.gain.setValueAtTime(.045,start+.6);
-      g.gain.linearRampToValueAtTime(.001,start+.72);
-      o.connect(g);
-      g.connect(c.destination);
-      o.start(start);
-      o.stop(start+.74);
+    const c = getAudioContext();
+    if (!c) return;
+
+    if (c.state === "suspended") c.resume();
+
+    const start = c.currentTime + 0.1;
+    const duration = 7;
+
+    // Cinematic rising and falling siren
+    const siren = c.createOscillator();
+    const sirenGain = c.createGain();
+
+    siren.type = "triangle";
+    siren.frequency.setValueAtTime(430, start);
+
+    for (let i = 0; i < 3; i++) {
+      const t = start + i * 2.2;
+      siren.frequency.setValueAtTime(430, t);
+      siren.frequency.linearRampToValueAtTime(900, t + 1.05);
+      siren.frequency.linearRampToValueAtTime(430, t + 2.2);
     }
-    setTimeout(()=>c.close(),3600);
-  } catch(e) {}
+
+    sirenGain.gain.setValueAtTime(0.001, start);
+    sirenGain.gain.linearRampToValueAtTime(0.045, start + 0.3);
+    sirenGain.gain.setValueAtTime(0.045, start + 6.5);
+    sirenGain.gain.linearRampToValueAtTime(0.001, start + duration);
+
+    siren.connect(sirenGain);
+    sirenGain.connect(c.destination);
+    siren.start(start);
+    siren.stop(start + duration);
+
+    // Low cinematic warning tone
+    const bass = c.createOscillator();
+    const bassGain = c.createGain();
+
+    bass.type = "sine";
+    bass.frequency.setValueAtTime(95, start);
+
+    bassGain.gain.setValueAtTime(0.001, start);
+    bassGain.gain.linearRampToValueAtTime(0.035, start + 0.5);
+
+    for (let i = 0; i < 7; i++) {
+      const t = start + 0.5 + i * 0.85;
+      bassGain.gain.setValueAtTime(0.035, t);
+      bassGain.gain.linearRampToValueAtTime(0.008, t + 0.4);
+      bassGain.gain.linearRampToValueAtTime(0.035, t + 0.8);
+    }
+
+    bassGain.gain.linearRampToValueAtTime(0.001, start + duration);
+    bass.connect(bassGain);
+    bassGain.connect(c.destination);
+    bass.start(start);
+    bass.stop(start + duration);
+
+  } catch (e) {
+    console.error("Nuclear alarm audio error:", e);
+  }
 }
 
 function receive(text) {
