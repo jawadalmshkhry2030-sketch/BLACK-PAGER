@@ -29,6 +29,8 @@ input{width:100%;padding:12px;background:#080d0a;color:white;border:1px solid #5
 .index-group{margin:12px 0;padding:10px;background:#0b100d;border:1px solid #303b33;border-radius:9px}
 .index-title{color:#b8ce9c;font-weight:bold}
 .index-item{padding:3px 0;border-bottom:1px solid #252b27}
+.meaning-toggle{margin-right:8px;padding:4px 9px;font-size:11px;border-color:#71806c;color:#c5d6b7}
+
 .toolbar{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}
 .toolbar button{flex:1}
 .small-actions{display:flex;gap:5px;flex-wrap:wrap;padding:0 9px 10px}
@@ -38,15 +40,17 @@ input{width:100%;padding:12px;background:#080d0a;color:white;border:1px solid #5
 .edit{border-color:#7b8050;color:#e5e8a9}
 .section-heading{max-width:650px;margin:25px auto 8px}
 @media(max-width:360px){.groups{grid-template-columns:1fr}}
+.wave-controls{display:flex;align-items:center;gap:7px;font-size:9px;letter-spacing:1px}
+.wave-next{padding:1px 7px;border:1px solid #43513a;border-radius:4px;background:#879b6c;color:#111;font-size:16px;font-weight:bold;line-height:1.1}
 </style>
 </head>
 <body>
-<h1>BLACK PAGER</h1>
+<h1>⛨ BLACK PAGER ⛨</h1>
 
 <section class="device">
-<div class="brand">THE GHOST'S</div>
+<div class="brand">⛨ THE GHOST'S ⛨</div>
 <div class="screen">
-<div class="top"><span id="state">POWER OFF</span><span>▰▰▰</span></div>
+<div class="top"><span id="state">POWER OFF</span><div class="wave-controls"><span id="waveLabel">WAVE 01</span><button type="button" id="waveNext" class="wave-next" aria-label="تغيير الموجة">↑</button></div></div>
 <div class="message" id="message">اضغط POWER</div>
 <div class="bottom"><span>BLACK PAGER</span><span id="clock">--:--</span></div>
 </div>
@@ -66,7 +70,7 @@ input{width:100%;padding:12px;background:#080d0a;color:white;border:1px solid #5
 <section class="panel">
 <h3>التخصيص المشترك</h3>
 <p style="font-size:12px;color:#aaa">أي إضافة أو تعديل أو حذف يظهر لجميع زوار الموقع.</p>
-<button class="add-button" id="addGroup">＋ إنشاء قائمة جديدة</button>
+<button class="add-button" id="addGroup">⊕ إنشاء قائمة جديدة</button>
 </section>
 
 <section class="panel">
@@ -75,8 +79,8 @@ input{width:100%;padding:12px;background:#080d0a;color:white;border:1px solid #5
 <button style="width:100%" id="indexBtn">فتح الفهرس</button>
 <div id="indexArea" hidden>
 <div class="toolbar">
-<button id="showAll">👁️ إظهار كل المعاني</button>
-<button id="hideAll">🙈 إخفاء كل المعاني</button>
+<button id="showAll">إظهار الكل</button>
+<button id="hideAll">إخفاء الكل</button>
 </div>
 <div class="index" id="index"></div>
 </div>
@@ -85,11 +89,20 @@ input{width:100%;padding:12px;background:#080d0a;color:white;border:1px solid #5
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io();
+
 const $ = id => document.getElementById(id);
 
+$("waveNext").onclick = () => {
+  currentWave = currentWave % totalWaves + 1;
+  $("waveLabel").textContent = "WAVE " + String(currentWave).padStart(2, "0");
+};
+
+
 let powered = false;
+let currentWave = 1;
+const totalWaves = 6;
 let data = [];
-let meaningsVisible = false;
+const visibleMeaningIds = new Set();
 let loading = false;
 
 socket.on("pager-message", receive);
@@ -159,7 +172,7 @@ function renderGroups() {
     const actions=document.createElement("div");
     actions.className="small-actions";
 
-    actions.appendChild(makeButton("＋ إضافة بيجر","",()=>addItem(group)));
+    actions.appendChild(makeButton("⊕ إضافة بيجر","",()=>addItem(group)));
     actions.appendChild(makeButton("تعديل القائمة","edit",()=>editGroup(group)));
     actions.appendChild(makeButton("حذف القائمة","danger",()=>deleteGroup(group)));
 
@@ -336,30 +349,47 @@ $("clear").onclick=()=>{
 };
 
 function renderIndex() {
-  const index=$("index");
+  const index = $("index");
   index.replaceChildren();
 
-  data.forEach((group,gi)=>{
-    const section=document.createElement("div");
-    section.className="index-group";
+  data.forEach((group) => {
+    const section = document.createElement("div");
+    section.className = "index-group";
 
-    const title=document.createElement("div");
-    title.className="index-title";
-    title.textContent=group.title;
+    const title = document.createElement("div");
+    title.className = "index-title";
+    title.textContent = group.title;
     section.appendChild(title);
 
-    group.items.forEach((item,i)=>{
-      const line=document.createElement("div");
-      line.className="index-item";
+    group.items.forEach((item, i) => {
+      const line = document.createElement("div");
+      line.className = "index-item";
 
-      const label=document.createElement("span");
-      label.textContent="بيجر "+(i+1)+": ";
+      const label = document.createElement("span");
+      label.textContent = "بيجر " + (i + 1) + ": ";
 
-      const meaning=document.createElement("span");
-      meaning.className="meaning";
-      meaning.textContent=meaningsVisible?item.phrase:"***";
+      const meaning = document.createElement("span");
+      meaning.className = "meaning";
+      meaning.textContent = visibleMeaningIds.has(item.id)
+        ? item.phrase
+        : "***";
 
-      line.append(label,meaning);
+      const toggle = document.createElement("button");
+      toggle.className = "meaning-toggle";
+      toggle.textContent = visibleMeaningIds.has(item.id)
+        ? "إخفاء"
+        : "إظهار";
+
+      toggle.onclick = () => {
+        if (visibleMeaningIds.has(item.id)) {
+          visibleMeaningIds.delete(item.id);
+        } else {
+          visibleMeaningIds.add(item.id);
+        }
+        renderIndex();
+      };
+
+      line.append(label, meaning, toggle);
       section.appendChild(line);
     });
 
@@ -367,35 +397,37 @@ function renderIndex() {
   });
 }
 
-$("showAll").onclick=()=>{
-  meaningsVisible=true;
+$("showAll").onclick = () => {
+  data.forEach(group => {
+    group.items.forEach(item => visibleMeaningIds.add(item.id));
+  });
   renderIndex();
 };
 
-$("hideAll").onclick=()=>{
-  meaningsVisible=false;
+$("hideAll").onclick = () => {
+  visibleMeaningIds.clear();
   renderIndex();
 };
 
-$("indexBtn").onclick=()=>{
-  if(!$("indexArea").hidden) {
-    $("indexArea").hidden=true;
+$("indexBtn").onclick = () => {
+  if (!$("indexArea").hidden) {
+    $("indexArea").hidden = true;
     $("index").replaceChildren();
-    $("pass").value="";
-    meaningsVisible=false;
-    $("indexBtn").textContent="فتح الفهرس";
+    $("pass").value = "";
+    visibleMeaningIds.clear();
+    $("indexBtn").textContent = "فتح الفهرس";
     return;
   }
 
-  if($("pass").value!=="SAD11") {
-    $("notice").textContent="كلمة المرور غير صحيحة";
+  if ($("pass").value !== "SAD11") {
+    $("notice").textContent = "كلمة المرور غير صحيحة";
     return;
   }
 
-  $("indexArea").hidden=false;
-  meaningsVisible=false;
+  $("indexArea").hidden = false;
+  visibleMeaningIds.clear();
   renderIndex();
-  $("indexBtn").textContent="إغلاق الفهرس";
+  $("indexBtn").textContent = "إغلاق الفهرس";
 };
 
 function clock() {
