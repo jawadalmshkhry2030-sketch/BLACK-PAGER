@@ -422,6 +422,8 @@ updateVolume();
 socket.on("pager-message", receive);
 socket.on("send-success", () => {
   $("notice").textContent = "تم إرسال الرسالة";
+  $("status").textContent = "تم إرسال الرسالة بنجاح";
+  flashPagerScreen();
 });
 socket.on("data-changed", loadData);
 
@@ -613,33 +615,53 @@ function sendPager(group,item) {
     text += " " + number.trim();
   }
 
+  beep();
+  flashPagerScreen();
+  $("state").textContent = "SENDING";
+  $("status").textContent = "جاري إرسال الرسالة";
   socket.emit("send-message",text);
   $("notice").textContent="جاري الإرسال...";
 }
 
+let pagerAudioContext = null;
+
 function getAudioContext() {
-  const C=window.AudioContext||window.webkitAudioContext;
-  if(!C)return null;
-  return new C();
+  const C = window.AudioContext || window.webkitAudioContext;
+  if (!C) return null;
+
+  if (!pagerAudioContext) pagerAudioContext = new C();
+
+  if (pagerAudioContext.state === "suspended") {
+    pagerAudioContext.resume().catch(() => {});
+  }
+
+  return pagerAudioContext;
 }
 
 function beep() {
   try {
-    const c=getAudioContext();
-    if(!c)return;
-    [0,250].forEach(delay=>{
-      const o=c.createOscillator();
-      const g=c.createGain();
-      o.type="square";
-      o.frequency.value=880;
-      g.gain.setValueAtTime(.035 * pagerVolume,c.currentTime+delay/1000);
+    const c = getAudioContext();
+    if (!c) return;
+
+    const start = c.currentTime + 0.02;
+
+    [0, 0.25].forEach(delay => {
+      const o = c.createOscillator();
+      const g = c.createGain();
+
+      o.type = "square";
+      o.frequency.value = 880;
+      g.gain.setValueAtTime(0.035 * pagerVolume, start + delay);
+      g.gain.setValueAtTime(0, start + delay + 0.14);
+
       o.connect(g);
       g.connect(c.destination);
-      o.start(c.currentTime+delay/1000);
-      o.stop(c.currentTime+delay/1000+.14);
+      o.start(start + delay);
+      o.stop(start + delay + 0.15);
     });
-    setTimeout(()=>c.close(),700);
-  } catch(e) {}
+  } catch (e) {
+    console.error("Pager beep error:", e);
+  }
 }
 
 function nuclearAlarm() {
@@ -830,14 +852,21 @@ $("indexBtn").onclick = () => {
 
 function clock() {
   const now = new Date();
+  const clockLabel = $("clock");
+  const dateLabel = $("dateLabel");
 
-  $("clock").textContent = now.toLocaleTimeString("en-GB", {
-    hour:"2-digit",
-    minute:"2-digit"
-  });
+  if (clockLabel) {
+    clockLabel.textContent =
+      now.getHours().toString().padStart(2, "0") + ":" +
+      now.getMinutes().toString().padStart(2, "0");
+  }
 
-  $("dateLabel").textContent =
-    now.toLocaleDateString("en-GB");
+  if (dateLabel) {
+    dateLabel.textContent =
+      now.getDate().toString().padStart(2, "0") + "/" +
+      (now.getMonth() + 1).toString().padStart(2, "0") + "/" +
+      now.getFullYear();
+  }
 }
 
 clock();
