@@ -7,7 +7,9 @@ const path = require("path");
 const setupAdmin = require("./admin-system");
 
 const app = express();
-app.use("/sounds", express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, "public")));
+app.use("/js", express.static(path.join(__dirname, "js")));
+app.use("/css", express.static(path.join(__dirname, "css")));
 const server = http.createServer(app);
 const io = new Server(server);
 
@@ -30,7 +32,9 @@ async function db(table, options = {}) {
       method: options.method || "GET",
       headers: {
         apikey: KEY,
-        Authorization: `Bearer ${KEY}`,
+        ...(KEY.startsWith("eyJ")
+          ? { Authorization: `Bearer ${KEY}` }
+          : {}),
         "Content-Type": "application/json",
         Prefer: options.prefer || "return=representation"
       },

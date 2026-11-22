@@ -1,0 +1,68 @@
+#adminEntry {
+  display:none;
+  margin:14px auto;
+  padding:12px;
+  width:min(92%,420px);
+  color:#00ff88;
+  background:#080d0a;
+  border:1px solid #087c48;
+  border-radius:8px;
+  text-align:center;
+  font-family:monospace;
+}
+#adminEntry button,#adminEntry input,#adminEntry select {
+  box-sizing:border-box;
+  width:100%;
+  margin:5px 0;
+  padding:10px;
+  background:#101a14;
+  color:#00ff88;
+  border:1px solid #087c48;
+  border-radius:5px;
+}
+#adminPanel {
+  display:none;
+  position:fixed;
+  inset:4%;
+  z-index:9999;
+  overflow:auto;
+  padding:16px;
+  color:#00ff88;
+  background:#050907;
+  border:1px solid #00a85a;
+  border-radius:10px;
+  font-family:monospace;
+}
+#adminPanel button,#adminPanel select {
+  padding:9px;
+  margin:5px;
+  color:#00ff88;
+  background:#101a14;
+  border:1px solid #087c48;
+  border-radius:5px;
+}
+.admin-device {
+  padding:10px;
+  margin:7px 0;
+  border:1px solid #174d32;
+  border-radius:6px;
+  overflow-wrap:anywhere;
+}
+
+#adminEntry textarea,
+#adminPanel textarea {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 5px 0;
+  padding: 10px;
+  color: #00ff88;
+  background: #101a14;
+  border: 1px solid #087c48;
+  border-radius: 5px;
+  overflow-wrap: anywhere;
+}
+
+#adminEntry input[readonly],
+#adminEntry textarea[readonly] {
+  user-select: all;
+}
