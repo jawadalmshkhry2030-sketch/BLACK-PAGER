@@ -541,6 +541,7 @@ $("hideAll").onclick = () => {
 };
 
 $("indexBtn").onclick = async () => {
+  $("notice").textContent = "تم الضغط على زر الفهرس - الاختبار يعمل";
   if (!$("indexArea").hidden) {
     $("indexArea").hidden = true;
     $("index").replaceChildren();
